@@ -1,0 +1,1081 @@
+{
+  "name": "My workflow 2",
+  "nodes": [
+    {
+      "parameters": {
+        "operation": "deleteFile",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "4ce3f387-5568-44bb-9d3c-628595119c8d",
+      "name": "Delete File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        752,
+        64
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "xXlQkk4L42ypZVNa",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "move",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.fileID }}",
+          "mode": "id"
+        },
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $json.folderId }}",
+          "mode": "id"
+        }
+      },
+      "id": "a0cd8cd5-05e8-4907-95af-78ae167bc901",
+      "name": "Move File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        752,
+        256
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "xXlQkk4L42ypZVNa",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{$json[\"id\"]}}\n",
+          "mode": "id"
+        },
+        "options": {
+          "binaryPropertyName": "={{ $json.mimeType}}"
+        }
+      },
+      "id": "71cffaaf-6c3b-491e-b1c1-d0fa7d12a709",
+      "name": "Download File",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        80,
+        448
+      ],
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "xXlQkk4L42ypZVNa",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse incoming WhatsApp message and extract command\nconst body = $input.first().json.messages[0].text.body || '';\nconst from = $input.first().json.contacts[0].wa_id || $input.first().json.messages[0].from || '';\nconst messageId = $input.first().json.messages[0].id || '';\n\n// Clean and normalize the message\nconst message = body.trim();\nconst parts = message.split(' ').filter(part => part.length > 0);\n\nif (parts.length === 0) {\n  return [{\n    json: {\n      error: 'Empty message received',\n      WaId: from,\n      originalMessage: body\n    }\n  }];\n}\n\nconst command = parts[0];\nlet result = {\n  command: command,\n  WaId: from,\n  originalMessage: body,\n  messageId: messageId,\n  timestamp: new Date().toISOString()\n};\n\n// Parse different command types\nswitch (command) {\n  case 'LIST':\n    result.folderPath = parts[1] || 'root';\n    break;\n    \n  case 'DELETE':\n    if (parts.length < 2) {\n      result.error = 'DELETE command requires file name/ID';\n    } else {\n      result.fileName = parts.slice(1, -1).join(' ');\n      result.confirmed = parts.includes('CONFIRM');\n      if (!result.confirmed) {\n        result.error = 'DELETE command requires CONFIRM keyword for safety';\n      }\n    }\n    break;\n    \n  case 'MOVE':\n    if (parts.length < 3) {\n      result.error = 'MOVE command requires source and destination';\n    } else {\n      result.sourceFile = parts[1];\n      result.destinationFolder = parts[2];\n    }\n    break;\n    \n  case 'SUMMARY':\n    result.folderPath = parts[1] || 'root';\n    break;\n    \n  case 'DOWNLOAD':\n    result.target = parts[1] || 'all';\n    break;\n    \n  case 'HELP':\n    result.helpRequested = true;\n    break;\n    \n  default:\n    result.error = `Unknown command: ${command}`;\n}\n\nreturn [{ json: result }];"
+      },
+      "id": "3c4ecedc-dd91-4370-a207-0ab022ae34bd",
+      "name": "Parse Command1",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -1680,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.error }}",
+              "operation": "isEmpty"
+            }
+          ]
+        }
+      },
+      "id": "27465f87-b3ae-457b-a0f6-daa8543fe187",
+      "name": "Check Valid Command1",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -1456,
+        368
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find file by name for deletion\nconst fileName = $('Check Valid Command1').item.json.fileName;\nconst files = $input.all().map((item) => item.json);\n\nconst matchingFiles = files.find((file) => file.name === fileName);\nif (!matchingFiles) {\n  return [{\n    json: {\n      error: `File '${fileName}' not found`,\n      WaId: $('Check Valid Command1').item.json.WaId\n    }\n  }];\n}\n\nconst fileToDelete = matchingFiles;\nreturn [{\n  json: {\n    ...fileToDelete,\n    WaId: $('Check Valid Command1').item.json.WaId,\n    fileName: fileName,\n  }\n}];"
+      },
+      "id": "65573f6e-5c63-4cb4-ba0a-9a25bfca771b",
+      "name": "Find File for Delete",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        64
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Find files and folder for move operation\nconst sourceFile = $('Check Valid Command1').item.json.sourceFile;\nconst destFolder = $('Check Valid Command1').item.json.destinationFolder;\nconst files = $input.all().map((item) => item.json);\n\n// Find source file with exact name match\nconst matchingFiles = files.find((file) => file.name === sourceFile);\n\nif (!matchingFiles) {\n  return [{\n    json: {\n      error: `Source file '${sourceFile}' not found`,\n      WaId: $('Check Valid Command1').item.json.WaId\n    }\n  }];\n}\n\n// Find destination folder with exact name match\nconst folders = files.find((folder) => folder.name === destFolder);\nif (!folders) {\n  return [{\n    json: {\n      error: `Destination folder '${destFolder}' not found`,\n      WaId: $('Check Valid Command1').item.json.WaId\n    }\n  }];\n}\n\nconst sourceFileObj = matchingFiles;\nconst destFolderObj = folders;\n\nreturn [{\n  json: {\n    fileID: sourceFileObj.id,\n    folderId: destFolderObj.id,\n    sourceFileName: sourceFileObj.name,\n    destFolderName: destFolderObj.name,\n    WaId: $('Check Valid Command1').item.json.WaId\n  }\n}];"
+      },
+      "id": "d4d6e93e-37eb-471b-b1d2-ea343a2c52fa",
+      "name": "Find Files for Move",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        528,
+        256
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const allowedExtensions = ['pdf', 'txt', 'doc', 'docx'];\n\nreturn items\n  .filter(item => {\n    const mimeType = item.json.mimeType || '';\n    const fileName = item.json.name || '';\n\n    if (mimeType === 'application/vnd.google-apps.document') {\n      return true;\n    }\n\n    const ext = fileName.split('.').pop().toLowerCase();\n    return allowedExtensions.includes(ext);\n  })\n  .map(item => ({\n    json: {\n      id: item.json.id,\n      name: item.json.name,\n      mimeType: item.json.mimeType,\n      waId: $('Parse Command1').first().json.WaId\n    }\n  }));\n"
+      },
+      "id": "9668259c-ea59-4f17-81c3-cfff767e528b",
+      "name": "Find Files for Summary",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -96,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "from": "=+14155238886",
+        "to": "={{ $json.WaId }}",
+        "toWhatsapp": true,
+        "message": "=❌ Error: {{ $json.error }}\n\n*Available Commands:*\n• LIST - Show all files\n• DELETE [filename] CONFIRM - Delete a file\n• MOVE [source] [destination] - Move file to folder\n• SUMMARY - Summarize documents\n• HELP - Show this help message",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.twilio",
+      "typeVersion": 1,
+      "position": [
+        1040,
+        1184
+      ],
+      "id": "073f4f2f-3512-43c1-a2ee-5b56e4656598",
+      "name": "Send Error Message",
+      "credentials": {
+        "twilioApi": {
+          "id": "HtREgYaRG1Sgdpca",
+          "name": "Twilio account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Audit logging for all operations\nconst operation = {\n  timestamp: new Date().toISOString(),\n  messageId: $('WhatsApp Trigger').first().json.messages[0].id || 'unknown',\n  from: $('WhatsApp Trigger').first().json.messages[0].from|| 'unknown',\n  command: $('Parse Command1').first().json.command || 'unknown',\n  originalMessage: $('Parse Command1').first().json.originalMessage || '',\n  success: !$json.error,\n  error: $json.error || null,\n  details: {\n    fileName: $json.fileName,\n    sourceFileName: $json.sourceFileName,\n    destFolderName: $json.destFolderName\n  }\n};\n\n// Log to console (in production, send to logging service)\nconsole.log('[AUDIT]', JSON.stringify(operation, null, 2));\n\nreturn [{ json: operation }];"
+      },
+      "id": "1060a27c-5128-47cc-b0b2-0d7569314df5",
+      "name": "Audit Log",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1200,
+        352
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1txNAie1wZ2Vzga80K3Gjd_mYNgFl4LiqiazayGEEPTQ",
+          "mode": "list",
+          "cachedResultName": "n8nproject log",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1txNAie1wZ2Vzga80K3Gjd_mYNgFl4LiqiazayGEEPTQ/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1txNAie1wZ2Vzga80K3Gjd_mYNgFl4LiqiazayGEEPTQ/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "autoMapInputData",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "timestamp",
+              "displayName": "timestamp",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "messageId",
+              "displayName": "messageId",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "from",
+              "displayName": "from",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "command",
+              "displayName": "command",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "originalMessage",
+              "displayName": "originalMessage",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "success",
+              "displayName": "success",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "error",
+              "displayName": "error",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "details",
+              "displayName": "details",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.6,
+      "position": [
+        1424,
+        352
+      ],
+      "id": "11f519e2-864d-4f57-aeb1-8c863751ed16",
+      "name": "Log to Sheets",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "fm2wBWDijRqINOBd",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "returnAll": true,
+        "filter": {
+          "folderId": {
+            "__rl": true,
+            "value": "1yUqO_EaazGxRFUakAPo0rx3Zcb5VhZDU",
+            "mode": "list",
+            "cachedResultName": "n8nProject",
+            "cachedResultUrl": "https://drive.google.com/drive/folders/1yUqO_EaazGxRFUakAPo0rx3Zcb5VhZDU"
+          },
+          "whatToSearch": "all"
+        },
+        "options": {
+          "fields": [
+            "id",
+            "name",
+            "mimeType"
+          ]
+        }
+      },
+      "id": "1b88c7f3-1b6d-4186-a706-7add6442a762",
+      "name": "List Files",
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        -1056,
+        -96
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "xXlQkk4L42ypZVNa",
+          "name": "Google Drive account"
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "operation": "pdf",
+        "binaryPropertyName": "application/pdf",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        512,
+        448
+      ],
+      "id": "aadce1fd-5409-459e-83df-e33e11bdc015",
+      "name": "Extract from File",
+      "alwaysOutputData": true
+    },
+    {
+      "parameters": {
+        "resource": "document",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-pro",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-pro"
+        },
+        "text": "=You are an assistant that summarizes documents into concise bullet points.  \nGiven the following text from a file, summarize the key points clearly and briefly.  \n- Limit to 4–6 bullet points.  \n- Keep each bullet point under 15 words.  \n- Remove any unnecessary details or repetition.  \n- If the content contains lists or steps, combine related ones.  \n\nText to summarize:\n{{ $json.text }}\nif the above text file is empty then don't retrun anything",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1,
+      "position": [
+        752,
+        448
+      ],
+      "id": "8879e931-df49-492b-ad5f-ea13bf5608b8",
+      "name": "Analyze document",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "sEv6JnyRpjN3daOS",
+          "name": "Google Gemini(PaLM) Api account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "application/pdf",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    },
+                    "id": "f5c095b2-1f2b-4b56-b26e-90e839f54ace"
+                  }
+                ],
+                "combinator": "and"
+              }
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "87188252-8e65-4de9-8fe6-524335329efa",
+                    "leftValue": "={{ $json.mimeType }}",
+                    "rightValue": "text/plain",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals",
+                      "name": "filter.operator.equals"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              }
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        272,
+        464
+      ],
+      "id": "4bed1689-5479-42b7-bbc2-07d27f87bec1",
+      "name": "Switch"
+    },
+    {
+      "parameters": {
+        "operation": "text",
+        "binaryPropertyName": "text/plain",
+        "destinationKey": "text",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1,
+      "position": [
+        528,
+        656
+      ],
+      "id": "7d577420-27a7-4d93-9ccd-56dda3aad222",
+      "name": "Extract from File1"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Check Valid Command1').item.json.command }}",
+              "value2": "HELP"
+            }
+          ]
+        }
+      },
+      "id": "4bd2de5d-f8d1-45da-ac1a-8690f7647e77",
+      "name": "Check Help",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        384,
+        976
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Parse Command1').item.json.command }}",
+              "value2": "LIST"
+            }
+          ]
+        }
+      },
+      "id": "f440ec03-0c21-4d6b-864e-262a996d4da8",
+      "name": "Check Command",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -832,
+        -96
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Check Valid Command1').item.json.command }}",
+              "value2": "=DELETE"
+            }
+          ]
+        }
+      },
+      "id": "27464f34-0b5a-4812-8da3-791ea4dc2a20",
+      "name": "Check Delete",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -704,
+        80
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Check Valid Command1').item.json.command }}",
+              "operation": "contains",
+              "value2": "MOVE"
+            }
+          ]
+        }
+      },
+      "id": "c5bae139-0517-4614-bb12-2dff3492f922",
+      "name": "Check Move",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -528,
+        272
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $('Parse Command1').item.json.command }}",
+              "operation": "contains",
+              "value2": "SUMMARY"
+            }
+          ]
+        }
+      },
+      "id": "790cbd86-dde7-46ac-9800-76e78c030f2a",
+      "name": "Check Summary",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [
+        -368,
+        448
+      ]
+    },
+    {
+      "parameters": {
+        "updates": [
+          "messages"
+        ],
+        "options": {}
+      },
+      "type": "n8n-nodes-base.whatsAppTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1936,
+        368
+      ],
+      "id": "55f306d9-cff6-4ce1-9370-67553ac1f5af",
+      "name": "WhatsApp Trigger",
+      "webhookId": "edb65f67-1127-4ecc-beb0-fb98a55af5ba",
+      "credentials": {
+        "whatsAppTriggerApi": {
+          "id": "5jit45wzk5pfM9OR",
+          "name": "WhatsApp OAuth account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=750567541470712",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.contacts[0].wa_id }}",
+        "textBody": "*WhatsApp Google Drive Manager*\n\n*Available Commands:*\n**LIST** - Show all files in root folder\n\n**DELETE [filename] CONFIRM** - Delete a specific file\nExample: DELETE report.pdf CONFIRM\n\n**MOVE [source] [destination]** - Move file to folder\nExample: MOVE document.txt Archive\n\n**SUMMARY** - Get AI summary of text documents\n\n**HELP** - Show this help message\n\n*Safety Note:* DELETE requires CONFIRM keyword",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        976,
+        640
+      ],
+      "id": "1f3c33b9-4609-4ab0-ba8f-922f063f7555",
+      "name": "send help message",
+      "webhookId": "02060f31-7cfc-41e5-ba82-dde97c120921",
+      "executeOnce": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1MhyKi0m0w5XAv4U",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=750567541470712",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').all().first().json.contacts[0].wa_id}}",
+        "textBody": "=📄 *{{ $('Find Files for Summary').item.json.name }}*\n\n{{ $json.content.parts[0].text }}\n\n---",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        976,
+        448
+      ],
+      "id": "e2a62b0b-abfe-4c70-83e0-cb32b4cf887c",
+      "name": "send summary",
+      "webhookId": "02060f31-7cfc-41e5-ba82-dde97c120921",
+      "executeOnce": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1MhyKi0m0w5XAv4U",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=750567541470712",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').all().first().json.contacts[0].wa_id}}",
+        "textBody": "=File '{{ $('Find Files for Move').item.json.sourceFileName }}' has been moved to folder '{{ $('Find Files for Move').item.json.destFolderName }}'",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        976,
+        256
+      ],
+      "id": "7ae583fa-d9f1-4fdf-8563-1d7dc85e5b97",
+      "name": "send move message",
+      "webhookId": "02060f31-7cfc-41e5-ba82-dde97c120921",
+      "executeOnce": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1MhyKi0m0w5XAv4U",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=750567541470712",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').all().first().json.contacts[0].wa_id}}",
+        "textBody": "=The file has been deleted",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        976,
+        64
+      ],
+      "id": "a92be9ec-b7c2-4daa-ba5b-647b13b7db26",
+      "name": "send delete message",
+      "webhookId": "02060f31-7cfc-41e5-ba82-dde97c120921",
+      "executeOnce": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1MhyKi0m0w5XAv4U",
+          "name": "WhatsApp account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "send",
+        "phoneNumberId": "=750567541470712",
+        "recipientPhoneNumber": "={{ $('WhatsApp Trigger').item.json.messages[0].from }}",
+        "textBody": "=*Documents in folder:*\n{{ $('List Files').all().map((item, index) => `${index + 1}. ${item.json.name}${item.json.size ? ` (${Math.round(item.json.size / 1024)} KB)` : ''}`).join('\\n') }}",
+        "additionalFields": {}
+      },
+      "type": "n8n-nodes-base.whatsApp",
+      "typeVersion": 1,
+      "position": [
+        976,
+        -112
+      ],
+      "id": "411abcb5-1e88-4dc8-9dc0-5675a1728055",
+      "name": "send list of documents",
+      "webhookId": "02060f31-7cfc-41e5-ba82-dde97c120921",
+      "executeOnce": true,
+      "credentials": {
+        "whatsAppApi": {
+          "id": "1MhyKi0m0w5XAv4U",
+          "name": "WhatsApp account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Parse Command1": {
+      "main": [
+        [
+          {
+            "node": "Check Valid Command1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Valid Command1": {
+      "main": [
+        [
+          {
+            "node": "List Files",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find File for Delete": {
+      "main": [
+        [
+          {
+            "node": "Delete File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Delete File": {
+      "main": [
+        [
+          {
+            "node": "send delete message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Files for Move": {
+      "main": [
+        [
+          {
+            "node": "Move File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Move File": {
+      "main": [
+        [
+          {
+            "node": "send move message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Files for Summary": {
+      "main": [
+        [
+          {
+            "node": "Download File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download File": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Error Message": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Audit Log": {
+      "main": [
+        [
+          {
+            "node": "Log to Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "List Files": {
+      "main": [
+        [
+          {
+            "node": "Check Command",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File": {
+      "main": [
+        [
+          {
+            "node": "Analyze document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze document": {
+      "main": [
+        [
+          {
+            "node": "send summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Extract from File",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Extract from File1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extract from File1": {
+      "main": [
+        [
+          {
+            "node": "Analyze document",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Help": {
+      "main": [
+        [
+          {
+            "node": "send help message",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Error Message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Command": {
+      "main": [
+        [
+          {
+            "node": "send list of documents",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Delete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Delete": {
+      "main": [
+        [
+          {
+            "node": "Find File for Delete",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Move",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Move": {
+      "main": [
+        [
+          {
+            "node": "Find Files for Move",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Summary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Summary": {
+      "main": [
+        [
+          {
+            "node": "Find Files for Summary",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Check Help",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "WhatsApp Trigger": {
+      "main": [
+        [
+          {
+            "node": "Parse Command1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send help message": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send summary": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send move message": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send delete message": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "send list of documents": {
+      "main": [
+        [
+          {
+            "node": "Audit Log",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": true,
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "versionId": "c76dce09-c5cc-4154-bebb-b928aa96961e",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "5ab85ed9f78a419a53721ed60a429425e1bd549ff6c96e7ff9e813735a37456b"
+  },
+  "id": "dwD9VxJNna3abNUb",
+  "tags": []
+}
